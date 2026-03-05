@@ -1,0 +1,11 @@
+sarvam:
+  base_url: "https://api.sarvam.ai/speech-to-text"
+  model: "saaras:v3"
+  mode: "transcribe"
+
+  request_config:
+    language: "hi-IN"
+    temperature: 0.0
+    response_format: "json"
+    diarization: false
+    punctuation: true

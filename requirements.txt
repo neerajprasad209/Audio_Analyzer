@@ -1,0 +1,10 @@
+loguru
+fastapi
+uvicorn
+python-multipart
+python-dotenv
+sarvamai
+requests
+PyYAML
+soundfile
+ipykernel

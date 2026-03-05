@@ -1,0 +1,18 @@
+[project]
+name = "audio-analyzer"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.131.0",
+    "ipykernel>=7.2.0",
+    "loguru>=0.7.3",
+    "python-dotenv>=1.2.1",
+    "python-multipart>=0.0.22",
+    "pyyaml>=6.0.3",
+    "requests>=2.32.5",
+    "sarvamai>=0.1.25",
+    "soundfile>=0.13.1",
+    "uvicorn>=0.41.0",
+]

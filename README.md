@@ -349,6 +349,73 @@ sarvam:
     diarization: true
 ```
 
+## How to Run
+
+### 1. Start the FastAPI Server
+
+```bash
+# Make sure virtual environment is activated
+at_env\Scripts\activate  # Windows
+# source at_env/bin/activate  # Unix/MacOS
+
+# Run the server
+uvicorn main:app --reload
+```
+
+The server will start at `http://localhost:8000`
+
+### 2. Test the API
+
+**Option A: Using cURL**
+
+```bash
+# Health check
+curl http://localhost:8000/
+
+# Upload audio file
+curl -X POST "http://localhost:8000/upload-audio" \
+  -F "file=@path/to/your/audio.wav"
+
+# Process audio file (replace with your file_id)
+curl -X POST "http://localhost:8000/process-audio" \
+  -H "Content-Type: application/json" \
+  -d '{"file_id": "your-file-id-here"}'
+```
+
+**Option B: Using Python requests**
+
+```python
+import requests
+
+# Upload audio
+with open("audio.wav", "rb") as f:
+    response = requests.post(
+        "http://localhost:8000/upload-audio",
+        files={"file": f}
+    )
+    file_id = response.json()["file_id"]
+    print(f"File ID: {file_id}")
+
+# Process audio
+response = requests.post(
+    "http://localhost:8000/process-audio",
+    json={"file_id": file_id}
+)
+print(response.json())
+```
+
+**Option C: Using Browser (Swagger UI)**
+
+1. Open browser and go to: `http://localhost:8000/docs`
+2. Use the interactive API documentation to test endpoints
+
+### 3. Check Results
+
+Transcription results are saved in:
+```
+uploads/results/{file_id}_{filename}.json
+```
+
 ## Usage
 
 ### Start the Server

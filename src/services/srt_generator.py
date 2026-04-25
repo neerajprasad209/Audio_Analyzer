@@ -5,7 +5,10 @@ from utils.logger import logger
 from src.services.gemini_client import get_gemini_llm
 
 
-def generate_srt_from_diarization(diarized_transcript: dict) -> str:
+def generate_srt_from_diarization(
+    diarized_transcript: dict,
+    gemini_api_key: str | None = None
+) -> str:
     """
     Convert diarized transcript JSON into SRT subtitle format using Gemini.
 
@@ -19,7 +22,7 @@ def generate_srt_from_diarization(diarized_transcript: dict) -> str:
     try:
         logger.info("Generating SRT from diarized transcript using Gemini")
 
-        llm = get_gemini_llm()
+        llm = get_gemini_llm(google_api_key=gemini_api_key)
 
         prompt_template = PromptTemplate(
             input_variables=["transcript"],

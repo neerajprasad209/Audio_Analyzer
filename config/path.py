@@ -17,5 +17,6 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Metadata file for tracking uploads
 METADATA_FILE = UPLOAD_DIR / "metadata.json"
 
-# Results directory for processed files
-RESULTS_DIR = UPLOAD_DIR / "results"
+# Session-scoped storage (one folder per active user session)
+SESSION_ROOT_DIR = UPLOAD_DIR
+SESSION_ROOT_DIR.mkdir(exist_ok=True)

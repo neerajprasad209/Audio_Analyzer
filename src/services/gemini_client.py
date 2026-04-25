@@ -8,13 +8,7 @@ from utils.logger import logger
 # Load environment variables
 load_dotenv(dotenv_path=ENV_PATH)
 
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-
-if not GOOGLE_API_KEY:
-    raise ValueError("GOOGLE_API_KEY not found in environment variables")
-
-
-def get_gemini_llm():
+def get_gemini_llm(google_api_key: str | None = None):
     """
     Initialize Gemini LLM using LangChain.
 
@@ -23,10 +17,14 @@ def get_gemini_llm():
     """
 
     try:
+        resolved_key = google_api_key or os.getenv("GOOGLE_API_KEY")
+        if not resolved_key:
+            raise ValueError("GOOGLE_API_KEY is required in request or .env")
+
         llm = ChatGoogleGenerativeAI(
             model="gemini-2.5-flash-lite",
             temperature=0,
-            google_api_key=GOOGLE_API_KEY
+            google_api_key=resolved_key
         )
 
         logger.info("Gemini LLM initialized successfully")

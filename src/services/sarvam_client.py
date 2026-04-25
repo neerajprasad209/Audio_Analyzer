@@ -1,35 +1,31 @@
-import os
 import json
-import requests
+import os
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
+
+import requests
 from dotenv import load_dotenv
 from sarvamai import SarvamAI
-from src.services.srt_generator import generate_srt_from_diarization
 
-from utils.logger import logger
 from config.path import ENV_PATH
+from src.services.srt_generator import generate_srt_from_diarization
+from utils.config_loader import load_settings
+from utils.logger import logger
 
-# Load environment variables
 load_dotenv(dotenv_path=ENV_PATH)
 
-SARVAM_API_KEY = os.getenv("SARVAM_API_KEY")
 
-if not SARVAM_API_KEY:
-    raise ValueError("SARVAM_API_KEY not found in environment variables")
+def resolve_sarvam_api_key(sarvam_api_key: str | None) -> str:
+    resolved_key = sarvam_api_key or os.getenv("SARVAM_API_KEY")
+    if not resolved_key:
+        raise ValueError("SARVAM_API_KEY is required in request or .env")
+    return resolved_key
 
 
 def load_metadata(metadata_file: Path) -> dict:
-    """
-    Load metadata JSON file.
-
-    Args:
-        metadata_file (Path): Path to metadata.json
-
-    Returns:
-        dict: Metadata dictionary
-    """
     try:
-        with open(metadata_file, "r") as f:
+        with open(metadata_file, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         logger.exception("Failed to load metadata file")
@@ -37,265 +33,191 @@ def load_metadata(metadata_file: Path) -> dict:
 
 
 def save_metadata(metadata_file: Path, data: dict) -> None:
-    """
-    Save metadata JSON file.
-
-    Args:
-        metadata_file (Path): Path to metadata.json
-        data (dict): Updated metadata
-    """
     try:
-        with open(metadata_file, "w") as f:
+        with open(metadata_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
     except Exception:
         logger.exception("Failed to save metadata")
         raise
 
 
-def parse_job_results(results_json: str) -> tuple:
+def parse_job_results(results_json: str) -> tuple[str, str]:
     """
-    Parse Sarvam job response JSON and extract job_id, file_name and file_id.
-
-    Args:
-        results_json (str): JSON string returned from results.model_dump_json()
-
-    Returns:
-        tuple: (job_id, file_name, file_id)
+    Parse Sarvam job response JSON and extract job_id and file_id.
     """
     try:
         data = json.loads(results_json)
-
         job_id = data.get("job_id")
-
         job_details = data.get("job_details", [])
 
         if not job_details:
             raise ValueError("No job_details found in Sarvam response")
 
         first_job = job_details[0]
-
         file_info = first_job["inputs"][0]
-
-        file_name = file_info["file_name"]
         file_id = file_info["file_id"]
 
-        logger.info(f"Parsed Sarvam job result: job_id={job_id}, file_name={file_name}, file_id={file_id}")
-
-        return job_id, file_name, file_id
-
+        logger.info(f"Parsed Sarvam job result: job_id={job_id}, file_id={file_id}")
+        return job_id, file_id
     except Exception:
         logger.exception("Failed to parse Sarvam job results")
         raise
 
 
-def fetch_download_url(job_id: str, file_id: str) -> str:
+def fetch_download_url(job_id: str, file_id: str, sarvam_api_key: str) -> str:
     """
-    Fetch download URL from Sarvam download-files API.
-
-    Args:
-        job_id (str): Sarvam job ID
-        file_id (str): File ID from Sarvam job response
-
-    Returns:
-        str: Download URL for transcript JSON
+    Fetch transcript download URL from Sarvam.
     """
     try:
-        file_id = f"{file_id}.json"
-        
-        logger.info(f"Fetching download URL from Sarvam for job_id={job_id}, file_id={file_id}")
-        
-        payload = {
-                "job_id": job_id,
-                "files": [file_id]  # Must be a list of strings
-            }
-
-        headers = {
-            "api-subscription-key": SARVAM_API_KEY,
-            "Content-Type": "application/json"
-        }
-
+        payload = {"job_id": job_id, "files": [f"{file_id}.json"]}
+        headers = {"api-subscription-key": sarvam_api_key, "Content-Type": "application/json"}
         url = "https://api.sarvam.ai/speech-to-text/job/v1/download-files"
 
-        logger.info(f"Requesting download URL for job_id={job_id}")
-
         response = requests.post(url, json=payload, headers=headers)
-
         response.raise_for_status()
-
         response_data = response.json()
-        
-        logger.info(f"Sarvam download URL response: {response_data}")
 
-        download_urls = response_data.get("download_urls", {})['0.json']['file_url']
-        logger.info(f"Extracted download URLs: {download_urls}")
+        download_urls = response_data.get("download_urls", {})
+        if not download_urls:
+            raise ValueError("No download URLs returned by Sarvam")
 
-        return download_urls
+        first_file = next(iter(download_urls.values()))
+        file_url = first_file.get("file_url")
+        if not file_url:
+            raise ValueError("Missing file_url in Sarvam download response")
 
+        return file_url
     except Exception:
         logger.exception("Failed to fetch download URL from Sarvam")
         raise
 
 
 def download_transcript(download_url: str) -> dict:
-    """
-    Download transcript JSON from Sarvam storage URL.
-
-    Args:
-        download_url (str): Signed download URL
-
-    Returns:
-        dict: Transcript JSON response
-    """
     try:
-        logger.info("Downloading transcript JSON from Sarvam storage")
-
         response = requests.get(download_url)
-
         response.raise_for_status()
-
-        transcript_json = response.json()
-
-        logger.info("Transcript JSON downloaded successfully")
-
-        return transcript_json
-
+        return response.json()
     except Exception:
         logger.exception("Failed to download transcript JSON")
         raise
 
 
+def load_sarvam_job_config() -> tuple[str, bool]:
+    """
+    Read Sarvam job configuration from config/settings.yaml.
+    Returns:
+        tuple: (model, with_diarization)
+    """
+    settings = load_settings() or {}
+    sarvam_settings = settings.get("sarvam", {})
+    request_config = sarvam_settings.get("request_config", {})
+
+    model = sarvam_settings.get("model") or "saaras:v3"
+    with_diarization = bool(request_config.get("diarization", True))
+    return model, with_diarization
+
+
 def transcribe_with_batch(
     file_path: str,
     file_hash: str,
-    metadata_file: Path
+    metadata_file: Path,
+    result_dir: Path,
+    mode: Literal["transcribe", "translate", "verbatim", "translit", "codemix"] = "transcribe",
+    sarvam_api_key: str | None = None,
+    gemini_api_key: str | None = None
 ) -> dict:
     """
-    Process audio file using Sarvam Batch API and store transcript in metadata.
-
-    Steps:
-    - Create batch job
-    - Upload file
-    - Start job
-    - Wait for completion
-    - Fetch transcript download URL
-    - Download transcript JSON
-    - Store transcript in metadata.json
-
-    Args:
-        file_path (str): Path to audio file
-        file_hash (str): SHA256 hash used as metadata key
-        metadata_file (Path): Path to metadata.json
-
-    Returns:
-        dict: Processing result
+    Process one audio file, update session metadata, and write SRT output.
     """
+    job = None
 
     try:
         logger.info(f"Starting Sarvam batch transcription for file: {file_path}")
 
-        client = SarvamAI(api_subscription_key=SARVAM_API_KEY)
+        resolved_sarvam_api_key = resolve_sarvam_api_key(sarvam_api_key)
+        client = SarvamAI(api_subscription_key=resolved_sarvam_api_key)
+        model, with_diarization = load_sarvam_job_config()
 
-        # Create Sarvam job
         job = client.speech_to_text_job.create_job(
-            model="saaras:v3",
-            mode="translit",
-            language_code="hi-IN",
-            with_diarization=True
+            model=model,
+            mode=mode,
+            with_diarization=with_diarization
         )
-
         logger.info(f"Sarvam job created successfully with job_id: {job.job_id}")
 
-        # Upload audio file
         job.upload_files(file_paths=[file_path])
-
-        logger.info("Audio file uploaded to Sarvam job")
-
-        # Start processing
         job.start()
-
-        logger.info("Sarvam batch job started")
-
-        # Wait until job finishes
         results = job.wait_until_complete()
 
-        logger.info(f"Sarvam job completed with state: {results.job_state}")
-
         metadata = load_metadata(metadata_file)
-        
-        logger.info(f"Loaded metadata: {metadata}")
+        files_data = metadata.setdefault("files", {})
+        metadata_record = files_data.get(file_hash)
+
+        if not metadata_record:
+            raise ValueError(f"Metadata record not found for file hash: {file_hash}")
 
         if results.job_state == "Completed":
-
-            # Convert Sarvam response to JSON
             results_json = results.model_dump_json()
-            
-            logger.info(f"Sarvam job results: {results_json}")
+            job_id, provider_file_id = parse_job_results(results_json)
 
-            # Extract job_id, file_name, file_id
-            job_id, file_name, file_id = parse_job_results(results_json)
-            
-            logger.info(f"Extracted from Sarvam results - job_id: {job_id}, file_name: {file_name}, file_id: {file_id}")
-
-            # Get transcript download URL
-            download_url = fetch_download_url(job_id, file_id)
-
-            # Download transcript JSON
+            download_url = fetch_download_url(job_id, provider_file_id, resolved_sarvam_api_key)
             transcript_json = download_transcript(download_url)
 
-            # Extract transcript fields
             transcript = transcript_json.get("transcript")
             diarized_transcript = transcript_json.get("diarized_transcript")
             timestamps = transcript_json.get("timestamps")
-            
+
             srt_output = None
+            srt_file_path = None
+            result_dir.mkdir(parents=True, exist_ok=True)
 
             if diarized_transcript:
                 try:
-                    srt_output = generate_srt_from_diarization(diarized_transcript)
-
-                    logger.info(f"SRT Output:\n{srt_output}")
-                    print(f"SRT Output:\n{srt_output}\n")
-
+                    srt_output = generate_srt_from_diarization(
+                        diarized_transcript,
+                        gemini_api_key=gemini_api_key
+                    )
+                    srt_file_path = result_dir / f"{metadata_record['file_id']}.srt"
+                    with open(srt_file_path, "w", encoding="utf-8") as srt_file:
+                        srt_file.write(srt_output)
                 except Exception:
                     logger.exception("SRT generation failed")
 
-            # Update metadata with transcript
-            metadata[file_hash]["status"] = "completed"
-            metadata[file_hash]["sarvam_job_id"] = job_id
-            metadata[file_hash]["transcript"] = transcript
-            metadata[file_hash]["diarized_transcript"] = diarized_transcript
-            metadata[file_hash]["timestamps"] = timestamps
-
+            metadata_record["status"] = "completed"
+            metadata_record["sarvam_job_id"] = job_id
+            metadata_record["transcript"] = transcript
+            metadata_record["diarized_transcript"] = diarized_transcript
+            metadata_record["timestamps"] = timestamps
+            metadata_record["result_file"] = None
+            metadata_record["srt_output"] = srt_output
+            metadata_record["srt_file"] = str(srt_file_path) if srt_file_path else None
+            metadata["last_active_at"] = datetime.now(timezone.utc).isoformat()
             save_metadata(metadata_file, metadata)
-
-            logger.info("Metadata updated with transcript successfully")
 
             return {
                 "status": "completed",
-                "sarvam_job_id": job_id
+                "sarvam_job_id": job_id,
+                "result_file": None,
+                "srt_file": str(srt_file_path) if srt_file_path else None
             }
 
-        else:
-
-            metadata[file_hash]["status"] = "failed"
-            metadata[file_hash]["sarvam_job_id"] = job.job_id
-
-            save_metadata(metadata_file, metadata)
-
-            logger.error("Sarvam transcription failed")
-
-            return {
-                "status": "failed",
-                "sarvam_job_id": job.job_id
-            }
-
-    except Exception:
-
-        logger.exception("Unexpected error during Sarvam batch transcription")
-
-        metadata = load_metadata(metadata_file)
-        metadata[file_hash]["status"] = "failed"
-
+        metadata_record["status"] = "failed"
+        metadata_record["sarvam_job_id"] = getattr(job, "job_id", None)
+        metadata["last_active_at"] = datetime.now(timezone.utc).isoformat()
         save_metadata(metadata_file, metadata)
 
+        return {"status": "failed", "sarvam_job_id": getattr(job, "job_id", None)}
+
+    except Exception:
+        logger.exception("Unexpected error during Sarvam batch transcription")
+        metadata = load_metadata(metadata_file)
+        files_data = metadata.setdefault("files", {})
+
+        if file_hash in files_data:
+            files_data[file_hash]["status"] = "failed"
+            if job and getattr(job, "job_id", None):
+                files_data[file_hash]["sarvam_job_id"] = job.job_id
+
+        metadata["last_active_at"] = datetime.now(timezone.utc).isoformat()
+        save_metadata(metadata_file, metadata)
         raise

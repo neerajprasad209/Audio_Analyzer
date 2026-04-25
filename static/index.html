@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Analyzer Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-top: #f6ece3;
+            --bg-bottom: #d9efe7;
+            --surface: rgba(255, 255, 255, 0.84);
+            --surface-strong: #ffffff;
+            --text: #1f2a2f;
+            --muted: #50616a;
+            --brand: #0f766e;
+            --brand-hover: #0a5f58;
+            --border: #d1ded8;
+            --shadow: 0 18px 50px rgba(38, 84, 74, 0.14);
+            --radius: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Manrope", "Segoe UI", sans-serif;
+            color: var(--text);
+            background: linear-gradient(165deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+            min-height: 100vh;
+        }
+
+        .backdrop {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background:
+                radial-gradient(circle at 16% 10%, rgba(245, 171, 117, 0.24), transparent 33%),
+                radial-gradient(circle at 84% 18%, rgba(87, 170, 157, 0.22), transparent 34%),
+                radial-gradient(circle at 52% 86%, rgba(230, 149, 90, 0.16), transparent 30%);
+            animation: drift 10s ease-in-out infinite alternate;
+        }
+
+        @keyframes drift {
+            from { transform: translateY(-8px); }
+            to { transform: translateY(8px); }
+        }
+
+        .layout {
+            max-width: 1040px;
+            margin: 0 auto;
+            padding: 30px 18px 42px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero {
+            display: grid;
+            gap: 10px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--surface);
+            backdrop-filter: blur(10px);
+            box-shadow: var(--shadow);
+            transform: translateY(10px);
+            opacity: 0;
+            animation: reveal 0.55s ease forwards;
+        }
+
+        @keyframes reveal {
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .hero h1 {
+            margin: 0;
+            font-family: "Space Grotesk", sans-serif;
+            font-size: clamp(1.65rem, 2.2vw + 1rem, 2.4rem);
+            font-weight: 700;
+            line-height: 1.14;
+        }
+
+        .hero p {
+            margin: 0;
+            color: var(--muted);
+            max-width: 680px;
+            font-size: 0.98rem;
+        }
+
+        .tools {
+            margin-top: 18px;
+            display: grid;
+            gap: 14px;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+        }
+
+        .panel {
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--surface);
+            box-shadow: var(--shadow);
+            padding: 18px;
+            transform: translateY(10px);
+            opacity: 0;
+            animation: reveal 0.45s ease forwards;
+        }
+
+        .panel:nth-child(1) { animation-delay: 0.08s; }
+        .panel:nth-child(2) { animation-delay: 0.14s; }
+        .panel:nth-child(3) { animation-delay: 0.2s; }
+
+        .panel h2 {
+            margin: 0 0 4px;
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 1.13rem;
+            font-weight: 700;
+        }
+
+        .panel p {
+            margin: 0 0 14px;
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        .panel-keys {
+            grid-column: span 12;
+        }
+
+        .panel-upload,
+        .panel-process {
+            grid-column: span 6;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.87rem;
+            font-weight: 700;
+        }
+
+        .field {
+            margin-bottom: 12px;
+        }
+
+        input[type="password"],
+        input[type="file"],
+        select {
+            width: 100%;
+            border: 1px solid #c5d8d2;
+            border-radius: 10px;
+            padding: 11px 12px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            background: #fbfdfc;
+            color: var(--text);
+        }
+
+        input[type="password"]:focus,
+        input[type="file"]:focus,
+        select:focus {
+            outline: 2px solid rgba(15, 118, 110, 0.24);
+            border-color: var(--brand);
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            border: 0;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 0.92rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.12s ease, background 0.12s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-primary {
+            background: var(--brand);
+            color: #fff;
+            box-shadow: 0 10px 24px rgba(15, 118, 110, 0.24);
+        }
+
+        .btn-primary:hover {
+            background: var(--brand-hover);
+        }
+
+        .btn-secondary {
+            background: #fff5eb;
+            color: #8e4a1d;
+            border: 1px solid #efcca9;
+        }
+
+        .btn-link {
+            background: #edf7f4;
+            color: #146357;
+            border: 1px solid #b8ddd4;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .note {
+            margin-top: 8px;
+            color: var(--muted);
+            font-size: 0.84rem;
+        }
+
+        .process-indicator {
+            margin-top: 14px;
+            border: 1px solid #d9e4e1;
+            border-radius: 10px;
+            background: #f9fcfb;
+            padding: 12px;
+            min-height: 74px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #4e6167;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .process-indicator .spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid #cfe2de;
+            border-top-color: var(--brand);
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .process-indicator.processing .spinner {
+            display: inline-block;
+        }
+
+        .process-indicator.completed {
+            border-color: #b8ddd4;
+            background: #edf7f4;
+            color: #146357;
+        }
+
+        .process-indicator.failed {
+            border-color: #ebc0bb;
+            background: #fff3f1;
+            color: #aa3a2b;
+        }
+
+        .process-indicator.idle {
+            color: #667b82;
+        }
+
+        .toast {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            max-width: 360px;
+            border-radius: 12px;
+            padding: 11px 14px;
+            border: 1px solid transparent;
+            background: #ffffff;
+            box-shadow: 0 16px 36px rgba(30, 59, 58, 0.2);
+            font-size: 0.9rem;
+            opacity: 0;
+            transform: translateY(10px);
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            z-index: 20;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .toast.success { border-color: #b3dfcb; }
+        .toast.error { border-color: #ebc0bb; }
+        .toast.info { border-color: #c4ddd8; }
+
+        @media (max-width: 900px) {
+            .panel-upload,
+            .panel-process {
+                grid-column: span 12;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="backdrop"></div>
+    <main class="layout">
+        <section class="hero">
+            <h1>Audio Analyzer Studio</h1>
+            <p>Save both API keys to start a private workspace folder, then upload files, transcribe, and download SRT from the same session folder.</p>
+        </section>
+
+        <section class="tools">
+            <section class="panel panel-keys">
+                <h2>1. Save API Keys</h2>
+                <p>Saving keys starts a session and creates a dedicated folder for this user workflow.</p>
+                <div class="field">
+                    <label for="sarvam-api-key">Sarvam API Key</label>
+                    <input id="sarvam-api-key" type="password" placeholder="Enter your Sarvam API key">
+                </div>
+                <div class="field">
+                    <label for="gemini-api-key">Gemini API Key</label>
+                    <input id="gemini-api-key" type="password" placeholder="Enter your Gemini API key">
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-primary" type="button" id="start-session-btn">Save Keys &amp; Start Session</button>
+                    <button class="btn btn-secondary" type="button" id="clear-session-btn">Clear Keys &amp; End Session</button>
+                </div>
+                <div class="note" id="session-note">Start a session to enable upload.</div>
+            </section>
+
+            <section class="panel panel-upload">
+                <h2>2. Upload Audio</h2>
+                <p>Uploaded files are stored inside your session folder under <code>audios/</code>.</p>
+                <div class="field">
+                    <label for="audio-file">Audio File</label>
+                    <input id="audio-file" type="file" accept=".wav,.mp3,.m4a,.flac,.aac,audio/*">
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-primary" type="button" id="upload-btn" disabled>Upload File</button>
+                </div>
+                <div class="note" id="upload-note">No file uploaded yet.</div>
+            </section>
+
+            <section class="panel panel-process">
+                <h2>3. Process + Download</h2>
+                <p>Processing stores transcript output and generated <code>.srt</code> in your session folder.</p>
+                <div class="field">
+                    <label for="mode-select">Mode</label>
+                    <select id="mode-select">
+                        <option value="transcribe" selected>transcribe (default)</option>
+                        <option value="translate">translate</option>
+                        <option value="verbatim">verbatim</option>
+                        <option value="translit">translit</option>
+                        <option value="codemix">codemix</option>
+                    </select>
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-primary" type="button" id="process-btn" disabled>Transcribe &amp; Generate SRT</button>
+                    <a class="btn btn-link" id="download-srt-btn" href="#" download style="display:none;">Download SRT</a>
+                </div>
+                <div class="note" id="process-note">Waiting for uploaded file.</div>
+                <div class="process-indicator idle" id="process-indicator">
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span id="process-state-text">Idle</span>
+                </div>
+            </section>
+        </section>
+    </main>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        const HEARTBEAT_MS = 60 * 1000;
+
+        const state = {
+            sessionId: null,
+            fileId: null,
+            heartbeatTimer: null
+        };
+
+        const els = {
+            sarvamApiKey: document.getElementById("sarvam-api-key"),
+            geminiApiKey: document.getElementById("gemini-api-key"),
+            startSessionBtn: document.getElementById("start-session-btn"),
+            clearSessionBtn: document.getElementById("clear-session-btn"),
+            sessionNote: document.getElementById("session-note"),
+            audioFile: document.getElementById("audio-file"),
+            uploadBtn: document.getElementById("upload-btn"),
+            processBtn: document.getElementById("process-btn"),
+            downloadSrtBtn: document.getElementById("download-srt-btn"),
+            uploadNote: document.getElementById("upload-note"),
+            processNote: document.getElementById("process-note"),
+            modeSelect: document.getElementById("mode-select"),
+            processIndicator: document.getElementById("process-indicator"),
+            processStateText: document.getElementById("process-state-text"),
+            toast: document.getElementById("toast")
+        };
+
+        function setWorkflowStatus(text) {
+            return text;
+        }
+
+        function setActiveSessionId(sessionId) {
+            return sessionId;
+        }
+
+        function setActiveFileId(fileId) {
+            return fileId;
+        }
+
+        function showToast(message, type = "info") {
+            els.toast.textContent = message;
+            els.toast.className = `toast ${type} show`;
+            window.setTimeout(() => {
+                els.toast.className = "toast";
+            }, 3200);
+        }
+
+        function detailFromResponse(data, fallbackMessage) {
+            if (!data) return fallbackMessage;
+            if (typeof data.detail === "string") return data.detail;
+            if (typeof data.message === "string") return data.message;
+            return fallbackMessage;
+        }
+
+        function updateButtons() {
+            els.uploadBtn.disabled = !state.sessionId;
+            els.processBtn.disabled = !(state.sessionId && state.fileId);
+        }
+
+        function setProcessState(stateName, text) {
+            els.processIndicator.className = `process-indicator ${stateName}`;
+            els.processStateText.textContent = text;
+        }
+
+        function startHeartbeat() {
+            stopHeartbeat();
+            if (!state.sessionId) return;
+
+            state.heartbeatTimer = window.setInterval(async () => {
+                if (!state.sessionId) return;
+                try {
+                    const response = await fetch("/session/heartbeat", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ session_id: state.sessionId })
+                    });
+
+                    if (!response.ok) {
+                        const data = await response.json().catch(() => ({}));
+                        throw new Error(detailFromResponse(data, "Session heartbeat failed"));
+                    }
+                } catch (error) {
+                    showToast(error.message, "error");
+                    await clearSession(false);
+                }
+            }, HEARTBEAT_MS);
+        }
+
+        function stopHeartbeat() {
+            if (state.heartbeatTimer) {
+                window.clearInterval(state.heartbeatTimer);
+                state.heartbeatTimer = null;
+            }
+        }
+
+        async function startSession() {
+            const sarvamApiKey = els.sarvamApiKey.value.trim();
+            const geminiApiKey = els.geminiApiKey.value.trim();
+
+            if (!sarvamApiKey || !geminiApiKey) {
+                showToast("Both API keys are required.", "error");
+                return;
+            }
+
+            if (state.sessionId) {
+                await clearSession(false);
+            }
+
+            els.startSessionBtn.disabled = true;
+            setWorkflowStatus("Starting Session");
+            els.sessionNote.textContent = "Creating user session folder...";
+
+            try {
+                const response = await fetch("/session/start", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        sarvam_api_key: sarvamApiKey,
+                        gemini_api_key: geminiApiKey
+                    })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(detailFromResponse(data, "Failed to start session"));
+                }
+
+                state.sessionId = data.session_id;
+                state.fileId = null;
+                setActiveSessionId(data.folder_name || data.session_id);
+                setActiveFileId(null);
+                setWorkflowStatus("Session Active");
+                els.sessionNote.textContent = "Session created. Upload is enabled.";
+                els.uploadNote.textContent = "No file uploaded yet.";
+                els.processNote.textContent = "Waiting for uploaded file.";
+                els.downloadSrtBtn.style.display = "none";
+                setProcessState("idle", "Ready for upload and processing");
+
+                updateButtons();
+                startHeartbeat();
+                showToast("Session folder created successfully.", "success");
+            } catch (error) {
+                setWorkflowStatus("Session Failed");
+                els.sessionNote.textContent = "Could not start session.";
+                showToast(error.message, "error");
+            } finally {
+                els.startSessionBtn.disabled = false;
+            }
+        }
+
+        async function clearSession(notify = true) {
+            stopHeartbeat();
+
+            const activeSession = state.sessionId;
+            state.sessionId = null;
+            state.fileId = null;
+            updateButtons();
+            setActiveSessionId(null);
+            setActiveFileId(null);
+            setWorkflowStatus("Idle");
+            els.uploadNote.textContent = "No file uploaded yet.";
+            els.processNote.textContent = "Waiting for uploaded file.";
+            els.sessionNote.textContent = "Start a session to enable upload.";
+            els.downloadSrtBtn.style.display = "none";
+            els.audioFile.value = "";
+            setProcessState("idle", "Idle");
+            els.modeSelect.value = "transcribe";
+            els.sarvamApiKey.value = "";
+            els.geminiApiKey.value = "";
+
+            if (!activeSession) {
+                if (notify) showToast("No active session.", "info");
+                return;
+            }
+
+            try {
+                await fetch("/session/end", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ session_id: activeSession })
+                });
+            } catch (error) {
+                console.warn("Session end request failed:", error);
+            }
+
+            if (notify) {
+                showToast("Session ended and folder deleted.", "success");
+            }
+        }
+
+        async function uploadFile() {
+            if (!state.sessionId) {
+                showToast("Start a session first.", "error");
+                return;
+            }
+
+            const selectedFile = els.audioFile.files[0];
+            if (!selectedFile) {
+                showToast("Please choose an audio file first.", "error");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("session_id", state.sessionId);
+            formData.append("file", selectedFile);
+
+            els.uploadBtn.disabled = true;
+            setWorkflowStatus("Uploading");
+            els.uploadNote.textContent = "Uploading file to session folder...";
+
+            try {
+                const response = await fetch("/upload-audio", {
+                    method: "POST",
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(detailFromResponse(data, "Upload failed."));
+                }
+
+                state.fileId = data.file_id;
+                setActiveFileId(data.file_id);
+                setWorkflowStatus("Uploaded");
+                els.uploadNote.textContent = data.message + " File ID: " + data.file_id;
+                els.processNote.textContent = "Ready to process this file.";
+                els.downloadSrtBtn.style.display = "none";
+                setProcessState("idle", "Uploaded and ready to process");
+                updateButtons();
+                showToast("Upload successful.", "success");
+            } catch (error) {
+                setWorkflowStatus("Upload Failed");
+                els.uploadNote.textContent = "Upload failed. Please try again.";
+                showToast(error.message, "error");
+            } finally {
+                els.uploadBtn.disabled = false;
+                updateButtons();
+            }
+        }
+
+        async function processFile() {
+            if (!state.sessionId || !state.fileId) {
+                showToast("Start session and upload a file first.", "error");
+                return;
+            }
+
+            els.processBtn.disabled = true;
+            setWorkflowStatus("Processing");
+            els.processNote.textContent = "Processing started. This can take a few minutes.";
+            els.downloadSrtBtn.style.display = "none";
+            setProcessState("processing", "Processing...");
+
+            try {
+                const response = await fetch("/process-audio", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        session_id: state.sessionId,
+                        file_id: state.fileId,
+                        mode: els.modeSelect.value
+                    })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(detailFromResponse(data, "Processing failed."));
+                }
+
+                if (data.status === "completed") {
+                    setWorkflowStatus("Completed");
+                    els.processNote.textContent = "Transcription and subtitle generation completed.";
+                    setProcessState("completed", "Completed");
+                    if (data.download_srt_url) {
+                        els.downloadSrtBtn.href = data.download_srt_url;
+                        els.downloadSrtBtn.style.display = "inline-flex";
+                    }
+                    showToast("SRT is ready for download.", "success");
+                } else if (data.status === "failed") {
+                    setWorkflowStatus("Failed");
+                    els.processNote.textContent = "Processing failed. Please retry.";
+                    setProcessState("failed", "Failed");
+                    showToast("Processing failed.", "error");
+                } else {
+                    setWorkflowStatus("In Progress");
+                    els.processNote.textContent = "Processing is still in progress.";
+                    setProcessState("processing", "Still processing...");
+                    showToast("Processing is still running.", "info");
+                }
+            } catch (error) {
+                setWorkflowStatus("Process Failed");
+                els.processNote.textContent = "Request failed. Please verify and retry.";
+                setProcessState("failed", "Failed");
+                showToast(error.message, "error");
+            } finally {
+                updateButtons();
+            }
+        }
+
+        function endSessionOnUnload() {
+            if (!state.sessionId) return;
+            const payload = JSON.stringify({ session_id: state.sessionId });
+            const blob = new Blob([payload], { type: "application/json" });
+            navigator.sendBeacon("/session/end", blob);
+        }
+
+        els.startSessionBtn.addEventListener("click", startSession);
+        els.clearSessionBtn.addEventListener("click", () => clearSession(true));
+        els.uploadBtn.addEventListener("click", uploadFile);
+        els.processBtn.addEventListener("click", processFile);
+        window.addEventListener("beforeunload", endSessionOnUnload);
+
+        setProcessState("idle", "Idle");
+        updateButtons();
+    </script>
+</body>
+</html>

@@ -7,5 +7,5 @@ sarvam:
     language: "hi-IN"
     temperature: 0.0
     response_format: "json"
-    diarization: false
+    diarization: true
     punctuation: true

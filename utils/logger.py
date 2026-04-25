@@ -28,7 +28,7 @@ def setup_app_logger():
         retention="7 days",   # Automatically deletes logs older than 7 days
         compression="zip",    # Compresses old logs to save space
         level="INFO",         # Saves INFO, WARNING, ERROR, and CRITICAL
-        enqueue=True,         # Safe to use with multi-threading/Async (like your AI Agent)
+        enqueue=False,        # Keep synchronous logging to avoid multiprocessing permission issues
         backtrace=True,       # Great for your AI project: logs the full error stack
         diagnose=True         # Shows variable values in the error log
     )

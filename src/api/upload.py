@@ -1,63 +1,36 @@
-import json
-import uuid
 import hashlib
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+
+from src.services.session_manager import (
+    get_session_paths,
+    load_session_metadata,
+    save_session_metadata,
+)
 from utils.logger import logger
-from config.path import UPLOAD_DIR, METADATA_FILE
 
 router = APIRouter()
 
 ALLOWED_EXTENSIONS = {".wav", ".mp3", ".m4a", ".flac", ".aac"}
-# METADATA_FILE = UPLOAD_DIR / "metadata.json"
-
-UPLOAD_DIR.mkdir(exist_ok=True)
-
-if not METADATA_FILE.exists():
-    with open(METADATA_FILE, "w") as f:
-        json.dump({}, f)
 
 
 def generate_file_hash(file_bytes: bytes) -> str:
-    """Generate SHA256 hash for uploaded file."""
     return hashlib.sha256(file_bytes).hexdigest()
 
 
-def load_metadata() -> dict:
-    """
-    Load metadata file.
-    If not exists, create empty metadata file.
-    """
-    try:
-        if not METADATA_FILE.exists():
-            logger.warning("metadata.json not found. Creating new one.")
-            with open(METADATA_FILE, "w") as f:
-                json.dump({}, f)
-            return {}
-
-        with open(METADATA_FILE, "r") as f:
-            return json.load(f)
-
-    except Exception:
-        logger.exception("Failed to load metadata")
-        raise
-
-
-def save_metadata(data: dict):
-    with open(METADATA_FILE, "w") as f:
-        json.dump(data, f, indent=4)
-
-
 @router.post("/upload-audio")
-async def upload_audio(file: UploadFile = File(...)):
+async def upload_audio(
+    session_id: str = Form(...),
+    file: UploadFile = File(...)
+):
     """
-    Upload audio file only.
-    No processing happens here.
+    Upload an audio file into the active session folder.
     """
-
     try:
-        logger.info("Upload request received")
+        logger.info(f"Upload request received for session: {session_id}")
 
         file_extension = Path(file.filename).suffix.lower()
         if file_extension not in ALLOWED_EXTENSIONS:
@@ -66,110 +39,55 @@ async def upload_audio(file: UploadFile = File(...)):
         file_bytes = await file.read()
         file_hash = generate_file_hash(file_bytes)
 
-        metadata = load_metadata()
+        paths = get_session_paths(session_id.strip())
+        metadata = load_session_metadata(session_id.strip())
+        files_data = metadata.setdefault("files", {})
 
-        # Duplicate check
-        if file_hash in metadata:
-            record = metadata[file_hash]
-
-            logger.info("Duplicate file detected")
-
+        # Duplicate check inside this session only.
+        if file_hash in files_data:
+            record = files_data[file_hash]
             return {
-                "message": "File already uploaded",
+                "message": "File already uploaded in this session",
+                "session_id": session_id,
                 "file_id": record["file_id"],
                 "status": record["status"]
             }
 
-        # New file
         file_id = str(uuid.uuid4())
-        new_filename = f"{file_id}_{file.filename}"
-        file_path = UPLOAD_DIR / new_filename
+        safe_name = Path(file.filename).name
+        stored_filename = f"{file_id}_{safe_name}"
+        file_path = paths["audio_dir"] / stored_filename
 
         with open(file_path, "wb") as buffer:
             buffer.write(file_bytes)
 
-        metadata[file_hash] = {
+        files_data[file_hash] = {
             "file_id": file_id,
-            "stored_filename": new_filename,
+            "original_filename": safe_name,
+            "stored_filename": stored_filename,
             "status": "uploaded",
             "sarvam_job_id": None,
-            "result_file": None
+            "result_file": None,
+            "srt_file": None,
+            "uploaded_at": datetime.now(timezone.utc).isoformat()
         }
+        metadata["last_active_at"] = datetime.now(timezone.utc).isoformat()
 
-        save_metadata(metadata)
+        save_session_metadata(session_id.strip(), metadata)
 
-        logger.info(f"File uploaded successfully with ID: {file_id}")
+        logger.info(f"File uploaded successfully: session={session_id}, file_id={file_id}")
 
         return {
             "message": "File uploaded successfully",
+            "session_id": session_id,
             "file_id": file_id,
             "status": "uploaded"
         }
 
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("Upload failed")
         raise HTTPException(status_code=500, detail="Internal Server Error")
     finally:
         logger.info("Audio upload request completed")
-        
-        
-        
-        # try:
-    #     logger.info("Received audio upload request")
-
-    #     file_extension = Path(file.filename).suffix.lower()
-
-    #     if file_extension not in ALLOWED_EXTENSIONS:
-    #         logger.error(f"Invalid file format: {file_extension}")
-    #         raise HTTPException(
-    #             status_code=400,
-    #             detail="Unsupported file format"
-    #         )
-
-    #     # Read file content
-    #     file_bytes = await file.read()
-
-    #     # Generate content hash
-    #     file_hash = generate_file_hash(file_bytes)
-
-    #     metadata = load_metadata()
-
-    #     # Check duplicate
-    #     if file_hash in metadata:
-    #         logger.warning("Duplicate file upload attempt detected")
-    #         raise HTTPException(
-    #             status_code=409,
-    #             detail="File already uploaded"
-    #         )
-
-    #     # Generate unique file ID
-    #     file_id = str(uuid.uuid4())
-    #     new_filename = f"{file_id}_{file.filename}"
-    #     file_path = UPLOAD_DIR / new_filename
-
-    #     # Save file
-    #     with open(file_path, "wb") as buffer:
-    #         buffer.write(file_bytes)
-
-    #     # Save metadata entry
-    #     metadata[file_hash] = {
-    #         "file_id": file_id,
-    #         "original_filename": file.filename,
-    #         "stored_filename": new_filename,
-    #         "status": "uploaded"
-    #     }
-
-    #     save_metadata(metadata)
-
-    #     logger.info(f"File stored successfully with ID: {file_id}")
-
-    #     return {
-    #         "message": "File uploaded successfully",
-    #         "file_id": file_id
-    #     }
-
-    # except HTTPException:
-    #     raise
-    # except Exception:
-    #     logger.exception("Unexpected error during file upload")
-    #     raise HTTPException(status_code=500, detail="Internal Server Error")

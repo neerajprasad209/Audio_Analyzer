@@ -161,6 +161,37 @@ Currently used by runtime job creation:
 
 `mode` comes from user input (UI/API request), not from `settings.yaml`.
 
+## How to Create API Keys
+
+This app expects keys in the UI at runtime (Save Keys & Start Session), not in `.env`.
+
+### Sarvam API key
+
+1. Sign up / log in to Sarvam Dashboard.
+2. Open API key management from your dashboard account.
+3. Create a new API subscription key.
+4. Copy and store it securely.
+
+Official docs:
+- Quickstart: `https://docs.sarvam.ai/api-reference-docs`
+- Authentication: `https://docs.sarvam.ai/api-reference-docs/authentication`
+
+### Google Gemini API key
+
+1. Open Google AI Studio API Keys page.
+2. Create a new Gemini API key.
+3. Copy and store it securely.
+
+Official docs:
+- Gemini API key guide: `https://ai.google.dev/gemini-api/docs/api-key`
+- AI Studio API key page: `https://aistudio.google.com/app/apikey`
+
+### Security notes
+
+1. Never commit API keys to git.
+2. Do not expose keys in client-side code for public apps.
+3. Rotate keys immediately if leaked.
+
 ## Installation
 
 Python `>= 3.12` is recommended.

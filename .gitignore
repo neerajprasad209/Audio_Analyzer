@@ -13,4 +13,5 @@ at_env/
 venv/
 env/
 logs/
+uploads/
 
